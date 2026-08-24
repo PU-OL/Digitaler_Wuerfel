@@ -1,6 +1,6 @@
 
 //Led Pattern[wuerfelnumber][lednumber-1]
-int ledPattern [8][7] = {
+byte ledPattern [8][7] = {
     {0, 0, 0, 0, 0, 0, 0},//All off
     {1, 1, 1, 1, 1, 1, 1},//All on
     {0, 0, 0, 1, 0, 0, 0},//1
@@ -29,7 +29,7 @@ void setup() {
 
 void loop() {
     //Check Button
-    int button = AnalogRead(A3);
+    int button = analogRead(A3);
 
     if(button < 400){
         shuffle = true;
