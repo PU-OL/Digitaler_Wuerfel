@@ -11,6 +11,8 @@
 *.dxf
 *.kicad_pcb-bak
 *.kicad_sch-bak
+*.gbr
+*.gbrjob
 *-backups
 *-cache*
 *-bak
