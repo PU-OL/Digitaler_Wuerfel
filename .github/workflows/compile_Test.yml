@@ -22,5 +22,5 @@ jobs:
           sketch-paths: |
             Digitaler_Wuerfel
             # Add mor sketch paths
-          libraries: |
+          #libraries: |
             # Add libary paths here
