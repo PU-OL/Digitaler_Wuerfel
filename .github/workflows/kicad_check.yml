@@ -18,24 +18,26 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout project
+      - name: Checkout
         uses: actions/checkout@v4
+
+      # ----------------------------------------
+      # KiCad 10
+      # ----------------------------------------
 
       - name: Install KiCad 10
         run: |
           sudo add-apt-repository --yes ppa:kicad/kicad-10.0-releases
           sudo apt update
-          sudo apt install --install-recommends \
-            kicad \
-            kicad-libraries
+          sudo apt install --install-recommends kicad
 
       - name: Show KiCad version
         run: |
           kicad-cli version
 
-      # --------------------------------------------------
+      # ----------------------------------------
       # Arduino KiCad Library
-      # --------------------------------------------------
+      # ----------------------------------------
 
       - name: Install Arduino KiCad Library
         run: |
@@ -43,7 +45,11 @@ jobs:
             https://github.com/Alarm-Siren/arduino-kicad-library.git \
             "$HOME/arduino-kicad-library"
 
-      - name: Configure KiCad libraries
+      # ----------------------------------------
+      # Register Arduino symbol library
+      # ----------------------------------------
+
+      - name: Configure Arduino symbol library
         run: |
           mkdir -p "$HOME/.config/kicad/10.0"
 
@@ -60,6 +66,14 @@ jobs:
           )
           EOF
 
+      # ----------------------------------------
+      # Register Arduino footprint library
+      # ----------------------------------------
+
+      - name: Configure Arduino footprint library
+        run: |
+          mkdir -p "$HOME/.config/kicad/10.0"
+
           cat > "$HOME/.config/kicad/10.0/fp-lib-table" <<EOF
           (fp_lib_table
             (version 7)
@@ -73,9 +87,9 @@ jobs:
           )
           EOF
 
-      # --------------------------------------------------
+      # ----------------------------------------
       # ERC
-      # --------------------------------------------------
+      # ----------------------------------------
 
       - name: Run ERC
         shell: bash
@@ -99,17 +113,9 @@ jobs:
               "$file"
           done
 
-      - name: Upload ERC reports
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: kicad-erc-reports
-          path: '**/*-erc.rpt'
-          if-no-files-found: ignore
-
-      # --------------------------------------------------
+      # ----------------------------------------
       # DRC
-      # --------------------------------------------------
+      # ----------------------------------------
 
       - name: Run DRC
         shell: bash
