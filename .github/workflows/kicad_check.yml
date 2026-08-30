@@ -1,0 +1,307 @@
+name: KiCad CI
+
+on:
+  push:
+    paths:
+      - '**/*.kicad_sch'
+      - '**/*.kicad_pcb'
+      - '**/*.kicad_pro'
+      - '**/*.kicad_mod'
+      - '**/*.kicad_sym'
+      - '**/*.kicad_dru'
+
+  pull_request:
+
+jobs:
+  kicad:
+    name: KiCad 10 ERC / DRC
+    runs-on: ubuntu-latest
+
+    steps:
+      # ============================================
+      # Checkout
+      # ============================================
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+
+      # ============================================
+      # Install KiCad 10
+      # ============================================
+
+      - name: Install KiCad 10
+        run: |
+          sudo add-apt-repository --yes ppa:kicad/kicad-10.0-releases
+          sudo apt-get update
+          sudo apt-get install -y kicad kicad-symbols kicad-footprints
+
+          echo "KiCad version:"
+          kicad-cli version
+
+      # ============================================
+      # Install Arduino KiCad Library
+
+      # ============================================
+
+      - name: Install Arduino KiCad Library
+        run: |
+          git clone --depth 1 \
+            https://github.com/Alarm-Siren/arduino-kicad-library.git \
+            "$HOME/arduino-kicad-library"
+
+          test -f \
+            "$HOME/arduino-kicad-library/symbols/arduino-library.kicad_sym"
+
+          test -d \
+            "$HOME/arduino-kicad-library/footprints/arduino-library.pretty"
+
+
+      # ============================================
+      # Configure KiCad libraries
+      # ============================================
+
+      - name: Configure KiCad libraries
+        shell: bash
+        run: |
+          set -e
+
+          CONFIG="$HOME/.config/kicad/10.0"
+
+          mkdir -p "$CONFIG"
+
+          echo "Searching KiCad libraries..."
+
+          SYMBOL_DIR="$(dirname "$(find /usr/share/kicad -type f -name 'Device.kicad_sym' -print -quit)")"
+          FOOTPRINT_DIR="$(dirname "$(find /usr/share/kicad -type d -name 'LED_THT.pretty' -print -quit)")"
+
+          echo "SYMBOL_DIR=$SYMBOL_DIR"
+          echo "FOOTPRINT_DIR=$FOOTPRINT_DIR"
+
+          test -n "$SYMBOL_DIR"
+          test -n "$FOOTPRINT_DIR"
+
+          test -f "$SYMBOL_DIR/Device.kicad_sym"
+          test -f "$SYMBOL_DIR/Switch.kicad_sym"
+          test -f "$SYMBOL_DIR/MCU_Module.kicad_sym"
+
+          test -d "$FOOTPRINT_DIR/LED_THT.pretty"
+          test -d "$FOOTPRINT_DIR/Resistor_THT.pretty"
+          test -d "$FOOTPRINT_DIR/Module.pretty"
+          test -d "$FOOTPRINT_DIR/Button_Switch_THT.pretty"
+
+
+          # --------------------------------------------
+          # Symbol libraries
+          # --------------------------------------------
+
+          cat > "$CONFIG/sym-lib-table" <<EOF
+          (sym_lib_table
+            (version 7)
+
+            (lib
+              (name "Device")
+              (type "KiCad")
+              (uri "$SYMBOL_DIR/Device.kicad_sym")
+              (options "")
+              (descr "KiCad Device")
+            )
+
+            (lib
+              (name "Switch")
+              (type "KiCad")
+              (uri "$SYMBOL_DIR/Switch.kicad_sym")
+              (options "")
+              (descr "KiCad Switch")
+            )
+
+            (lib
+              (name "MCU_Module")
+              (type "KiCad")
+              (uri "$SYMBOL_DIR/MCU_Module.kicad_sym")
+              (options "")
+              (descr "KiCad MCU Module")
+            )
+
+            (lib
+              (name "PCM_arduino-library")
+              (type "KiCad")
+              (uri "$HOME/arduino-kicad-library/symbols/arduino-library.kicad_sym")
+              (options "")
+              (descr "Arduino KiCad Library")
+            )
+          )
+          EOF
+
+
+          # --------------------------------------------
+          # Footprint libraries
+          # --------------------------------------------
+
+          cat > "$CONFIG/fp-lib-table" <<EOF
+          (fp_lib_table
+            (version 7)
+
+            (lib
+              (name "LED_THT")
+              (type "KiCad")
+              (uri "$FOOTPRINT_DIR/LED_THT.pretty")
+              (options "")
+              (descr "KiCad LED THT")
+            )
+
+            (lib
+              (name "Resistor_THT")
+              (type "KiCad")
+              (uri "$FOOTPRINT_DIR/Resistor_THT.pretty")
+              (options "")
+              (descr "KiCad Resistor THT")
+            )
+
+            (lib
+              (name "Module")
+              (type "KiCad")
+              (uri "$FOOTPRINT_DIR/Module.pretty")
+              (options "")
+              (descr "KiCad Module")
+            )
+
+            (lib
+              (name "Button_Switch_THT")
+              (type "KiCad")
+              (uri "$FOOTPRINT_DIR/Button_Switch_THT.pretty")
+              (options "")
+              (descr "KiCad Button Switch THT")
+            )
+
+            (lib
+              (name "PCM_arduino-library")
+              (type "KiCad")
+              (uri "$HOME/arduino-kicad-library/footprints/arduino-library.pretty")
+              (options "")
+              (descr "Arduino KiCad Library")
+            )
+          )
+          EOF
+
+
+          echo
+          echo "========================================"
+          echo "Library configuration"
+          echo "========================================"
+
+          cat "$CONFIG/sym-lib-table"
+          cat "$CONFIG/fp-lib-table"
+
+
+      # ============================================
+      # ERC
+      # ============================================
+
+      - name: Run ERC
+        shell: bash
+        run: |
+          set +e
+
+          failed=0
+          mkdir -p reports/erc
+
+          mapfile -d '' files < <(
+            find . -type f -name '*.kicad_sch' -print0
+          )
+
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No KiCad schematics found."
+            exit 0
+          fi
+
+          for file in "${files[@]}"; do
+
+            echo "========================================"
+            echo "ERC: $file"
+            echo "========================================"
+
+            name="$(basename "$file" .kicad_sch)"
+            report="reports/erc/${name}-erc.rpt"
+
+            kicad-cli sch erc \
+              --output "$report" \
+              --exit-code-violations \
+              "$file"
+
+            result=$?
+
+            cat "$report" 2>/dev/null || true
+
+            if [ "$result" -ne 0 ]; then
+              echo "ERC FAILED: $file"
+              failed=1
+            else
+              echo "ERC PASSED: $file"
+            fi
+          done
+
+          exit "$failed"
+
+
+      # ============================================
+      # DRC
+      # ============================================
+
+      - name: Run DRC
+        shell: bash
+        run: |
+          set +e
+
+          failed=0
+          mkdir -p reports/drc
+
+          mapfile -d '' files < <(
+            find . -type f -name '*.kicad_pcb' -print0
+          )
+
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No KiCad PCBs found."
+            exit 0
+          fi
+
+          for file in "${files[@]}"; do
+
+            echo "========================================"
+            echo "DRC: $file"
+            echo "========================================"
+
+            name="$(basename "$file" .kicad_pcb)"
+            report="reports/drc/${name}-drc.rpt"
+
+            kicad-cli pcb drc \
+              --output "$report" \
+              --exit-code-violations \
+              "$file"
+
+            result=$?
+
+            cat "$report" 2>/dev/null || true
+
+            if [ "$result" -ne 0 ]; then
+              echo "DRC FAILED: $file"
+              failed=1
+            else
+              echo "DRC PASSED: $file"
+            fi
+          done
+
+          exit "$failed"
+
+
+      # ============================================
+      # Reports
+      # ============================================
+
+      - name: Upload KiCad reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kicad-reports
+          path: reports/
+          if-no-files-found: ignore
