@@ -18,18 +18,17 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-
-      # ==========================================
-      # Repository
-      # ==========================================
+      # ============================================
+      # Checkout
+      # ============================================
 
       - name: Checkout repository
         uses: actions/checkout@v4
 
 
-      # ==========================================
-      # KiCad 10
-      # ==========================================
+      # ============================================
+      # Install KiCad 10
+      # ============================================
 
       - name: Install KiCad 10
         run: |
@@ -37,14 +36,15 @@ jobs:
           sudo apt update
           sudo apt install --install-recommends kicad
 
-      - name: Check KiCad
+      - name: Show KiCad version
         run: |
           kicad-cli version
+          kicad-cli version --format about
 
 
-      # ==========================================
-      # Arduino KiCad Library
-      # ==========================================
+      # ============================================
+      # Install Arduino KiCad Library
+      # ============================================
 
       - name: Install Arduino KiCad Library
         run: |
@@ -52,102 +52,180 @@ jobs:
             https://github.com/Alarm-Siren/arduino-kicad-library.git \
             "$HOME/arduino-kicad-library"
 
+          test -f \
+            "$HOME/arduino-kicad-library/symbols/arduino-library.kicad_sym"
 
-      # ==========================================
-      # Configure Arduino libraries
-      # ==========================================
+          test -d \
+            "$HOME/arduino-kicad-library/footprints/arduino-library.pretty"
+
+
+      # ============================================
+      # Configure KiCad libraries
+      # ============================================
       #
-      # WICHTIG:
-      # Die Arduino-Library wird in der
-      # projektbezogenen Tabelle eingetragen.
+      # Wir kopieren die von KiCad mitgelieferten
+      # Standardtabellen und ERWEITERN sie um Arduino.
       #
-      # Die KiCad Standard-Libraries werden NICHT
-      # überschrieben.
+      # Die Standard-Libraries bleiben dadurch erhalten.
       #
 
-      - name: Configure Arduino libraries
+      - name: Configure KiCad libraries
         shell: bash
         run: |
-          PROJECT_DIR="./Wuerfel_Schaltplan"
+          set -e
 
-          test -f "$PROJECT_DIR/Wuerfel_Schaltplan.kicad_pro"
+          KICAD_CONFIG="$HOME/.config/kicad/10.0"
+          TEMPLATE="/usr/share/kicad/template"
 
-          cat > "$PROJECT_DIR/sym-lib-table" <<EOF
-          (sym_lib_table
-            (version 7)
-            (lib
+          mkdir -p "$KICAD_CONFIG"
+
+          echo "=== KiCad template directory ==="
+          ls -la "$TEMPLATE"
+
+          echo
+          echo "=== Installed KiCad symbols ==="
+          find /usr/share/kicad -maxdepth 3 \
+            -name 'Device.kicad_sym' \
+            -o -name 'Switch.kicad_sym' \
+            -o -name 'MCU_Module.kicad_sym'
+
+          echo
+          echo "=== Installed KiCad footprints ==="
+          find /usr/share/kicad -maxdepth 3 \
+            -type d \
+            \( -name 'LED_THT.pretty' \
+            -o -name 'Resistor_THT.pretty' \
+            -o -name 'Module.pretty' \
+            -o -name 'Button_Switch_THT.pretty' \)
+
+
+          # ------------------------------------------------
+          # Die mit KiCad gelieferten Tabellen suchen
+          # ------------------------------------------------
+
+          GLOBAL_SYM_TABLE="$TEMPLATE/sym-lib-table"
+          GLOBAL_FP_TABLE="$TEMPLATE/fp-lib-table"
+
+          if [ ! -f "$GLOBAL_SYM_TABLE" ]; then
+            echo "ERROR: KiCad sym-lib-table not found:"
+            echo "$GLOBAL_SYM_TABLE"
+            exit 1
+          fi
+
+          if [ ! -f "$GLOBAL_FP_TABLE" ]; then
+            echo "ERROR: KiCad fp-lib-table not found:"
+            echo "$GLOBAL_FP_TABLE"
+            exit 1
+          fi
+
+
+          # ------------------------------------------------
+          # Standardtabellen übernehmen
+          # ------------------------------------------------
+
+          cp "$GLOBAL_SYM_TABLE" \
+            "$KICAD_CONFIG/sym-lib-table"
+
+          cp "$GLOBAL_FP_TABLE" \
+            "$KICAD_CONFIG/fp-lib-table"
+
+
+          # ------------------------------------------------
+          # Arduino Symbol Library hinzufügen
+          # ------------------------------------------------
+
+          python3 <<'PY'
+          from pathlib import Path
+
+          config = Path.home() / ".config/kicad/10.0"
+          table = config / "sym-lib-table"
+
+          text = table.read_text()
+
+          entry = '''    (lib
               (name "PCM_arduino-library")
               (type "KiCad")
-              (uri "$HOME/arduino-kicad-library/symbols/arduino-library.kicad_sym")
+              (uri "__ARDUINO_SYMBOLS__")
               (options "")
               (descr "Arduino KiCad Library")
             )
-          )
-          EOF
+          '''
 
-          cat > "$PROJECT_DIR/fp-lib-table" <<EOF
-          (fp_lib_table
-            (version 7)
-            (lib
+          if "PCM_arduino-library" not in text:
+              text = text.replace(
+                  "(sym_lib_table\n",
+                  "(sym_lib_table\n" + entry,
+                  1
+              )
+
+          text = text.replace(
+              "__ARDUINO_SYMBOLS__",
+              str(
+                  Path.home()
+                  / "arduino-kicad-library/symbols/arduino-library.kicad_sym"
+              )
+          )
+
+          table.write_text(text)
+          PY
+
+
+          # ------------------------------------------------
+          # Arduino Footprint Library hinzufügen
+          # ------------------------------------------------
+
+          python3 <<'PY'
+          from pathlib import Path
+
+          config = Path.home() / ".config/kicad/10.0"
+          table = config / "fp-lib-table"
+
+          text = table.read_text()
+
+          entry = '''    (lib
               (name "PCM_arduino-library")
               (type "KiCad")
-              (uri "$HOME/arduino-kicad-library/footprints/arduino-library.pretty")
+              (uri "__ARDUINO_FOOTPRINTS__")
               (options "")
               (descr "Arduino KiCad Library")
             )
+          '''
+
+          if "PCM_arduino-library" not in text:
+              text = text.replace(
+                  "(fp_lib_table\n",
+                  "(fp_lib_table\n" + entry,
+                  1
+              )
+
+          text = text.replace(
+              "__ARDUINO_FOOTPRINTS__",
+              str(
+                  Path.home()
+                  / "arduino-kicad-library/footprints/arduino-library.pretty"
+              )
           )
-          EOF
 
-          echo "=== Symbol library table ==="
-          cat "$PROJECT_DIR/sym-lib-table"
+          table.write_text(text)
+          PY
+
 
           echo
-          echo "=== Footprint library table ==="
-          cat "$PROJECT_DIR/fp-lib-table"
-
-
-      # ==========================================
-      # Check that KiCad's standard libraries
-      # actually exist
-      # ==========================================
-
-      - name: Check KiCad standard libraries
-        shell: bash
-        run: |
-          echo "Searching for KiCad libraries..."
+          echo "========================================"
+          echo "Final symbol library table"
+          echo "========================================"
+          cat "$KICAD_CONFIG/sym-lib-table"
 
           echo
-          echo "Device:"
-          find /usr -name 'Device.kicad_sym' 2>/dev/null | head
-
-          echo
-          echo "Switch:"
-          find /usr -name 'Switch.kicad_sym' 2>/dev/null | head
-
-          echo
-          echo "MCU_Module:"
-          find /usr -name 'MCU_Module.kicad_sym' 2>/dev/null | head
-
-          echo
-          echo "LED_THT:"
-          find /usr -type d -name 'LED_THT.pretty' 2>/dev/null | head
-
-          echo
-          echo "Resistor_THT:"
-          find /usr -type d -name 'Resistor_THT.pretty' 2>/dev/null | head
-
-          echo
-          echo "Module:"
-          find /usr -type d -name 'Module.pretty' 2>/dev/null | head
-
-          echo
-          echo "Button_Switch_THT:"
-          find /usr -type d -name 'Button_Switch_THT.pretty' 2>/dev/null | head
+          echo "========================================"
+          echo "Final footprint library table"
+          echo "========================================"
+          cat "$KICAD_CONFIG/fp-lib-table"
 
 
-      # ==========================================
+      # ============================================
       # ERC
-      # ==========================================
+      # ============================================
 
       - name: Run ERC
         shell: bash
@@ -193,9 +271,9 @@ jobs:
           exit $failed
 
 
-      # ==========================================
+      # ============================================
       # DRC
-      # ==========================================
+      # ============================================
 
       - name: Run DRC
         shell: bash
@@ -241,9 +319,9 @@ jobs:
           exit $failed
 
 
-      # ==========================================
-      # Reports
-      # ==========================================
+      # ============================================
+      # Reports immer hochladen
+      # ============================================
 
       - name: Upload KiCad reports
         if: always()
