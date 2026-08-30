@@ -45,26 +45,100 @@ jobs:
             https://github.com/Alarm-Siren/arduino-kicad-library.git \
             "$HOME/arduino-kicad-library"
 
-      # ----------------------------------------
-      # Register Arduino symbol library
-      # ----------------------------------------
-
-      - name: Configure Arduino symbol library
+      - name: Configure KiCad libraries
+        shell: bash
         run: |
           mkdir -p "$HOME/.config/kicad/10.0"
 
-          cat > "$HOME/.config/kicad/10.0/sym-lib-table" <<EOF
-          (sym_lib_table
-            (version 7)
-            (lib
-              (name "arduino-library")
-              (type "KiCad")
-              (uri "$HOME/arduino-kicad-library/symbols/arduino-library.kicad_sym")
-              (options "")
-              (descr "Arduino KiCad Library")
-            )
-          )
-          EOF
+          # --------------------------------------------
+          # Symbol libraries
+          # --------------------------------------------
+
+          {
+            echo '(sym_lib_table'
+            echo '  (version 7)'
+
+            find /usr/share/kicad/symbols \
+              -maxdepth 1 \
+              -type f \
+              -name '*.kicad_sym' \
+              -printf '%f\n' |
+            sort |
+            while read -r file; do
+              name="${file%.kicad_sym}"
+
+              echo "  (lib"
+              echo "    (name \"$name\")"
+              echo "    (type \"KiCad\")"
+              echo "    (uri \"/usr/share/kicad/symbols/$file\")"
+              echo '    (options "")'
+              echo '    (descr "")'
+              echo '  )'
+            done
+
+            # Arduino symbols
+            echo '  (lib'
+            echo '    (name "arduino-library")'
+            echo '    (type "KiCad")'
+            echo "    (uri \"$HOME/arduino-kicad-library/symbols/arduino-library.kicad_sym\")"
+            echo '    (options "")'
+            echo '    (descr "Arduino KiCad Library")'
+            echo '  )'
+
+            echo ')'
+          } > "$HOME/.config/kicad/10.0/sym-lib-table"
+
+
+          # --------------------------------------------
+          # Footprint libraries
+          # --------------------------------------------
+
+          {
+            echo '(fp_lib_table'
+            echo '  (version 7)'
+
+            find /usr/share/kicad/footprints \
+              -maxdepth 1 \
+              -type d \
+              -name '*.pretty' \
+              -printf '%f\n' |
+            sort |
+            while read -r dir; do
+              name="${dir%.pretty}"
+
+              echo "  (lib"
+              echo "    (name \"$name\")"
+              echo "    (type \"KiCad\")"
+              echo "    (uri \"/usr/share/kicad/footprints/$dir\")"
+              echo '    (options "")'
+              echo '    (descr "")'
+              echo '  )'
+            done
+
+            # Arduino footprints
+            echo '  (lib'
+            echo '    (name "arduino-library")'
+            echo '    (type "KiCad")'
+            echo "    (uri \"$HOME/arduino-kicad-library/footprints/arduino-library.pretty\")"
+            echo '    (options "")'
+            echo '    (descr "Arduino KiCad Library")'
+            echo '  )'
+
+            echo ')'
+          } > "$HOME/.config/kicad/10.0/fp-lib-table"
+
+
+          # --------------------------------------------
+          # Debug: show relevant libraries
+          # --------------------------------------------
+
+          echo "=== Symbol libraries ==="
+          grep -E 'name "(Device|Switch|MCU_Module|arduino-library)"' \
+            "$HOME/.config/kicad/10.0/sym-lib-table" || true
+
+          echo "=== Footprint libraries ==="
+          grep -E 'name "(LED_THT|Resistor_THT|Module|Button_Switch_THT|arduino-library)"' \
+            "$HOME/.config/kicad/10.0/fp-lib-table" || true
 
       # ----------------------------------------
       # Register Arduino footprint library
