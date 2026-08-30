@@ -1,0 +1,31 @@
+on:
+  push:
+    paths:
+      - '**.ino'
+      
+  pull_request:
+
+jobs:
+  compile-sketch:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        fqbn:
+          - arduino:megaavr:uno2026:mode=on
+          - arduino:mbed:nanoesp32
+          - arduino:mbed:giga
+          - arduino:renesas_uno:unor4wifi
+          - arduino:renesas_uno:unor4minima
+          - arduino:megaavr:unoQ
+          - arduino:avr:nano
+          
+    steps:
+      - uses: actions/checkout@v4
+      - uses: arduino/compile-sketches@v1
+        with:
+          sketch-paths: |
+            - Digitaler_Wuerfel
+            # Add mor sketch paths
+          #libraries: |
+            # Add libary paths here
