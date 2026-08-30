@@ -18,13 +18,16 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # ============================================
+      # Checkout
+      # ============================================
 
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
 
       # ============================================
-      # KiCad 10
+      # Install KiCad 10
       # ============================================
 
       - name: Install KiCad 10
@@ -36,9 +39,9 @@ jobs:
           echo "KiCad version:"
           kicad-cli version
 
-
       # ============================================
-      # Arduino Library
+      # Install Arduino KiCad Library
+
       # ============================================
 
       - name: Install Arduino KiCad Library
@@ -55,7 +58,7 @@ jobs:
 
 
       # ============================================
-      # Configure KiCad
+      # Configure KiCad libraries
       # ============================================
 
       - name: Configure KiCad libraries
