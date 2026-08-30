@@ -62,12 +62,6 @@ jobs:
       # ============================================
       # Configure KiCad libraries
       # ============================================
-      #
-      # Wir kopieren die von KiCad mitgelieferten
-      # Standardtabellen und ERWEITERN sie um Arduino.
-      #
-      # Die Standard-Libraries bleiben dadurch erhalten.
-      #
 
       - name: Configure KiCad libraries
         shell: bash
@@ -80,14 +74,14 @@ jobs:
           mkdir -p "$KICAD_CONFIG"
 
           echo "=== KiCad template directory ==="
-          ls -la "$TEMPLATE"
+          ls -la "$TEMPLATE" || echo "Template directory not found"
 
           echo
           echo "=== Installed KiCad symbols ==="
           find /usr/share/kicad -maxdepth 3 \
             -name 'Device.kicad_sym' \
             -o -name 'Switch.kicad_sym' \
-            -o -name 'MCU_Module.kicad_sym'
+            -o -name 'MCU_Module.kicad_sym' || echo "Some symbols not found"
 
           echo
           echo "=== Installed KiCad footprints ==="
@@ -96,119 +90,100 @@ jobs:
             \( -name 'LED_THT.pretty' \
             -o -name 'Resistor_THT.pretty' \
             -o -name 'Module.pretty' \
-            -o -name 'Button_Switch_THT.pretty' \)
-
-
-          # ------------------------------------------------
-          # Die mit KiCad gelieferten Tabellen suchen
-          # ------------------------------------------------
-
-          GLOBAL_SYM_TABLE="$TEMPLATE/sym-lib-table"
-          GLOBAL_FP_TABLE="$TEMPLATE/fp-lib-table"
-
-          if [ ! -f "$GLOBAL_SYM_TABLE" ]; then
-            echo "ERROR: KiCad sym-lib-table not found:"
-            echo "$GLOBAL_SYM_TABLE"
-            exit 1
-          fi
-
-          if [ ! -f "$GLOBAL_FP_TABLE" ]; then
-            echo "ERROR: KiCad fp-lib-table not found:"
-            echo "$GLOBAL_FP_TABLE"
-            exit 1
-          fi
-
+            -o -name 'Button_Switch_THT.pretty' \) || echo "Some footprints not found"
 
           # ------------------------------------------------
-          # Standardtabellen übernehmen
+          # Create default library tables if they don't exist
           # ------------------------------------------------
 
-          cp "$GLOBAL_SYM_TABLE" \
-            "$KICAD_CONFIG/sym-lib-table"
-
-          cp "$GLOBAL_FP_TABLE" \
-            "$KICAD_CONFIG/fp-lib-table"
-
-
-          # ------------------------------------------------
-          # Arduino Symbol Library hinzufügen
-          # ------------------------------------------------
-
-          python3 <<'PY'
+          # Create symbol library table
+          python3 <<'PY_SYM'
           from pathlib import Path
 
-          config = Path.home() / ".config/kicad/10.0"
-          table = config / "sym-lib-table"
-
-          text = table.read_text()
-
-          entry = '''    (lib
-              (name "PCM_arduino-library")
-              (type "KiCad")
-              (uri "__ARDUINO_SYMBOLS__")
-              (options "")
-              (descr "Arduino KiCad Library")
-            )
+          config_dir = Path.home() / ".config/kicad/10.0"
+          config_dir.mkdir(parents=True, exist_ok=True)
+          
+          sym_table = config_dir / "sym-lib-table"
+          
+          default_sym_table = '''(sym_lib_table
+            (version 7)
+            (lib (name "Device") (type "KiCad") (uri "${KIPRJMOD}/../../../usr/share/kicad/symbols/Device.kicad_sym") (options "") (descr "Device symbols"))
+            (lib (name "Switch") (type "KiCad") (uri "${KIPRJMOD}/../../../usr/share/kicad/symbols/Switch.kicad_sym") (options "") (descr "Switch symbols"))
+            (lib (name "MCU_Module") (type "KiCad") (uri "${KIPRJMOD}/../../../usr/share/kicad/symbols/MCU_Module.kicad_sym") (options "") (descr "MCU Module symbols"))
+            (lib (name "PCM_arduino-library") (type "KiCad") (uri "__ARDUINO_SYMBOLS__") (options "") (descr "Arduino KiCad Library"))
+          )
           '''
-
+          
+          if not sym_table.exists():
+              text = default_sym_table
+          else:
+              text = sym_table.read_text()
+          
+          # Add Arduino library if not present
           if "PCM_arduino-library" not in text:
               text = text.replace(
-                  "(sym_lib_table\n",
-                  "(sym_lib_table\n" + entry,
+                  "(sym_lib_table",
+                  "(sym_lib_table",
                   1
               )
-
+              # Insert before closing paren
+              text = text.rstrip()[:-1]  # Remove last )
+              text += '''
+            (lib (name "PCM_arduino-library") (type "KiCad") (uri "__ARDUINO_SYMBOLS__") (options "") (descr "Arduino KiCad Library"))
+          )
+          '''
+          
+          # Replace placeholder
           text = text.replace(
               "__ARDUINO_SYMBOLS__",
-              str(
-                  Path.home()
-                  / "arduino-kicad-library/symbols/arduino-library.kicad_sym"
-              )
+              str(Path.home() / "arduino-kicad-library/symbols/arduino-library.kicad_sym")
           )
+          
+          sym_table.write_text(text)
+          print(f"Created/Updated symbol library table: {sym_table}")
+          PY_SYM
 
-          table.write_text(text)
-          PY
-
-
-          # ------------------------------------------------
-          # Arduino Footprint Library hinzufügen
-          # ------------------------------------------------
-
-          python3 <<'PY'
+          # Create footprint library table
+          python3 <<'PY_FP'
           from pathlib import Path
 
-          config = Path.home() / ".config/kicad/10.0"
-          table = config / "fp-lib-table"
-
-          text = table.read_text()
-
-          entry = '''    (lib
-              (name "PCM_arduino-library")
-              (type "KiCad")
-              (uri "__ARDUINO_FOOTPRINTS__")
-              (options "")
-              (descr "Arduino KiCad Library")
-            )
+          config_dir = Path.home() / ".config/kicad/10.0"
+          config_dir.mkdir(parents=True, exist_ok=True)
+          
+          fp_table = config_dir / "fp-lib-table"
+          
+          default_fp_table = '''(fp_lib_table
+            (version 7)
+            (lib (name "LED_THT") (type "KiCad") (uri "${KIPRJMOD}/../../../usr/share/kicad/footprints/LED_THT.pretty") (options "") (descr "LED through-hole footprints"))
+            (lib (name "Resistor_THT") (type "KiCad") (uri "${KIPRJMOD}/../../../usr/share/kicad/footprints/Resistor_THT.pretty") (options "") (descr "Resistor through-hole footprints"))
+            (lib (name "Module") (type "KiCad") (uri "${KIPRJMOD}/../../../usr/share/kicad/footprints/Module.pretty") (options "") (descr "Module footprints"))
+            (lib (name "Button_Switch_THT") (type "KiCad") (uri "${KIPRJMOD}/../../../usr/share/kicad/footprints/Button_Switch_THT.pretty") (options "") (descr "Button/Switch through-hole footprints"))
+            (lib (name "PCM_arduino-library") (type "KiCad") (uri "__ARDUINO_FOOTPRINTS__") (options "") (descr "Arduino KiCad Library"))
+          )
           '''
-
+          
+          if not fp_table.exists():
+              text = default_fp_table
+          else:
+              text = fp_table.read_text()
+          
+          # Add Arduino library if not present
           if "PCM_arduino-library" not in text:
-              text = text.replace(
-                  "(fp_lib_table\n",
-                  "(fp_lib_table\n" + entry,
-                  1
-              )
-
+              text = text.rstrip()[:-1]  # Remove last )
+              text += '''
+            (lib (name "PCM_arduino-library") (type "KiCad") (uri "__ARDUINO_FOOTPRINTS__") (options "") (descr "Arduino KiCad Library"))
+          )
+          '''
+          
+          # Replace placeholder
           text = text.replace(
               "__ARDUINO_FOOTPRINTS__",
-              str(
-                  Path.home()
-                  / "arduino-kicad-library/footprints/arduino-library.pretty"
-              )
+              str(Path.home() / "arduino-kicad-library/footprints/arduino-library.pretty")
           )
-
-          table.write_text(text)
-          PY
-
+          
+          fp_table.write_text(text)
+          print(f"Created/Updated footprint library table: {fp_table}")
+          PY_FP
 
           echo
           echo "========================================"
@@ -262,6 +237,8 @@ jobs:
 
             if [ $result -ne 0 ]; then
               echo "ERC FAILED: $file"
+              echo "Report content:"
+              cat "$report" || true
               failed=1
             else
               echo "ERC PASSED: $file"
@@ -310,6 +287,8 @@ jobs:
 
             if [ $result -ne 0 ]; then
               echo "DRC FAILED: $file"
+              echo "Report content:"
+              cat "$report" || true
               failed=1
             else
               echo "DRC PASSED: $file"
