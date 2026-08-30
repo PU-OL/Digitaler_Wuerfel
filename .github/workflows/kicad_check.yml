@@ -1,27 +1,72 @@
+name: KiCad Check
+
 on:
   push:
     paths:
-      - '**.sch'
-      - '**.kicad_pcb'
+      - '**/*.kicad_sch'
+      - '**/*.kicad_pcb'
+      - '**/*.kicad_pro'
+      - '**/*.kicad_dru'
+      - '**/*.kicad_mod'
+      - '**/*.kicad_sym'
+      - '**/*.kicad_fp'
+
   pull_request:
-    paths:
-      - '**.sch'
-      - '**.kicad_pcb'
 
 jobs:
-  test:
+  kicad-check:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
-      - name: Run KiCad Actions
-        uses: actions-for-kicad/kicad-actions@v2-k10.0
-        with:
-          schematic_file_name: ./file.kicad_sch
-          pcb_file_name: ./file.kicad_pcb
-          run_erc: true
-          run_drc: true
-      - name: Upload Results
-        uses: actions/upload-artifact@v4
-        with:
-          name: KiCad Outputs
-          path: ./output
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install KiCad 10
+        run: |
+          sudo add-apt-repository --yes ppa:kicad/kicad-10.0-releases
+          sudo apt update
+          sudo apt install --install-recommends kicad
+
+      - name: Show KiCad version
+        run: |
+          kicad-cli version
+
+      - name: Check schematics
+        shell: bash
+        run: |
+          mapfile -d '' files < <(find . -type f -name '*.kicad_sch' -print0)
+
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No KiCad schematics found."
+            exit 0
+          fi
+
+          for file in "${files[@]}"; do
+            echo "========================================"
+            echo "Checking schematic: $file"
+            echo "========================================"
+
+            kicad-cli sch erc \
+              --exit-code-violations \
+              "$file"
+          done
+
+      - name: Check PCBs
+        shell: bash
+        run: |
+          mapfile -d '' files < <(find . -type f -name '*.kicad_pcb' -print0)
+
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No KiCad PCBs found."
+            exit 0
+          fi
+
+          for file in "${files[@]}"; do
+            echo "========================================"
+            echo "Checking PCB: $file"
+            echo "========================================"
+
+            kicad-cli pcb drc \
+              --exit-code-violations \
+              "$file"
+          done
