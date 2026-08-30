@@ -186,6 +186,14 @@ jobs:
               --exit-code-violations \
               "$file"
           done
+      - name: Upload ERC report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: erc-reports
+          path: '**/*-erc.rpt'
+          if-no-files-found: warn
+
 
       # ----------------------------------------
       # DRC
