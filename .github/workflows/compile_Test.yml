@@ -1,6 +1,10 @@
 on:
-  - push
-  - pull_request
+  push:
+    paths:
+      - '**.ino'
+      
+  pull_request:
+
 jobs:
   compile-sketch:
     runs-on: ubuntu-latest
@@ -14,6 +18,7 @@ jobs:
           - arduino:renesas_uno:unor4wifi
           - arduino:renesas_uno:unor4minima
           - arduino:megaavr:unoQ
+          - arduino:avr:nano
           
     steps:
       - uses: actions/checkout@v4
