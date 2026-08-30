@@ -9,16 +9,16 @@ on:
       - '**/*.kicad_dru'
       - '**/*.kicad_mod'
       - '**/*.kicad_sym'
-      - '**/*.kicad_fp'
 
   pull_request:
 
 jobs:
   kicad-check:
+    name: KiCad 10 ERC / DRC
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout project
         uses: actions/checkout@v4
 
       - name: Install KiCad 10
@@ -31,10 +31,56 @@ jobs:
         run: |
           kicad-cli version
 
-      - name: Check schematics
+      # --------------------------------------------------
+      # Arduino KiCad Library
+      # --------------------------------------------------
+
+      - name: Install Arduino KiCad Library
+        run: |
+          git clone --depth 1 \
+            https://github.com/Alarm-Siren/arduino-kicad-library.git \
+            "$HOME/arduino-kicad-library"
+
+      - name: Configure KiCad libraries
+        run: |
+          mkdir -p "$HOME/.config/kicad/10.0"
+
+          cat > "$HOME/.config/kicad/10.0/sym-lib-table" <<EOF
+          (sym_lib_table
+            (version 7)
+            (lib
+              (name "arduino-library")
+              (type "KiCad")
+              (uri "$HOME/arduino-kicad-library/symbols/arduino-library.kicad_sym")
+              (options "")
+              (descr "Arduino KiCad Library")
+            )
+          )
+          EOF
+
+          cat > "$HOME/.config/kicad/10.0/fp-lib-table" <<EOF
+          (fp_lib_table
+            (version 7)
+            (lib
+              (name "arduino-library")
+              (type "KiCad")
+              (uri "$HOME/arduino-kicad-library/footprints/arduino-library.pretty")
+              (options "")
+              (descr "Arduino KiCad Library")
+            )
+          )
+          EOF
+
+      # --------------------------------------------------
+      # ERC
+      # --------------------------------------------------
+
+      - name: Run ERC
         shell: bash
         run: |
-          mapfile -d '' files < <(find . -type f -name '*.kicad_sch' -print0)
+          mapfile -d '' files < <(
+            find . -type f -name '*.kicad_sch' -print0
+          )
 
           if [ ${#files[@]} -eq 0 ]; then
             echo "No KiCad schematics found."
@@ -43,7 +89,7 @@ jobs:
 
           for file in "${files[@]}"; do
             echo "========================================"
-            echo "Checking schematic: $file"
+            echo "ERC: $file"
             echo "========================================"
 
             kicad-cli sch erc \
@@ -51,10 +97,16 @@ jobs:
               "$file"
           done
 
-      - name: Check PCBs
+      # --------------------------------------------------
+      # DRC
+      # --------------------------------------------------
+
+      - name: Run DRC
         shell: bash
         run: |
-          mapfile -d '' files < <(find . -type f -name '*.kicad_pcb' -print0)
+          mapfile -d '' files < <(
+            find . -type f -name '*.kicad_pcb' -print0
+          )
 
           if [ ${#files[@]} -eq 0 ]; then
             echo "No KiCad PCBs found."
@@ -63,7 +115,7 @@ jobs:
 
           for file in "${files[@]}"; do
             echo "========================================"
-            echo "Checking PCB: $file"
+            echo "DRC: $file"
             echo "========================================"
 
             kicad-cli pcb drc \
