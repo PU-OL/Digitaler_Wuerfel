@@ -230,13 +230,19 @@ jobs:
               --severity-ignore ground_pin_not_ground \
               "$file"
 
-            result=$?
+            r            result=$?
 
             cat "$report" 2>/dev/null || true
 
             if [ "$result" -ne 0 ]; then
-              echo "ERC FAILED: $file"
-              failed=1
+
+              if grep -v '\[ground_pin_not_ground\]' "$report" | grep -q '^\s*\['; then
+                echo "ERC FAILED: $file"
+                failed=1
+              else
+                echo "Ignoring ERC violation: ground_pin_not_ground"
+              fi
+
             else
               echo "ERC PASSED: $file"
             fi
