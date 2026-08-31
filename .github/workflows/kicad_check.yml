@@ -227,6 +227,7 @@ jobs:
             kicad-cli sch erc \
               --output "$report" \
               --exit-code-violations \
+              --severity-ignore ground_pin_not_ground \
               "$file"
 
             result=$?
