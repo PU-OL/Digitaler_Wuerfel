@@ -1,4 +1,3 @@
-
 //Led Pattern[wuerfelnumber][lednumber-1]
 byte ledPattern [8][7] = {
     {0, 0, 0, 0, 0, 0, 0},//All off
@@ -10,7 +9,6 @@ byte ledPattern [8][7] = {
     {1, 0, 1, 1, 1, 0, 1},//5
     {1, 1, 1, 0, 1, 1, 1}//6
 };
-bool shuffle = false;
 
 void setup() {
     Serial.begin(115200);  
@@ -19,7 +17,7 @@ void setup() {
     for(int i = 0; i < 7; i++){
         pinMode(i+2, OUTPUT);
         digitalWrite(i+2, ledPattern[1][i]);
-        delay(250);
+        delay(500);
     }
     delay(2000);
     for(int i = 0; i < 7; i++){
@@ -29,27 +27,28 @@ void setup() {
 
 void loop() {
     //Check Button
-    int button = analogRead(A3);
-
-    if(button < 400){
-        shuffle = true;
-    }else if(button > 600){
-        //Get Random Number
-        shuffle = false;
-        int roll = random(1, 6);
-        for (int i = 0; i < 7; i++){
-            digitalWrite(i+2, ledPattern[roll][i]);
-        }
-        delay(4000);
+    Serial.println(analogRead(A3));
+    if(analogRead(A3) < 400){
+       shuffle();
     }
+}
 
-    //Shuffle Animation
-    if(shuffle){
-        for (int i = 0; i < 8; i++){
+void shuffle(){
+    while(analogRead(A3) < 600){
+        for (int i = 2; i < 8; i++){
             for (int j = 0; j < 7; j++){
                 digitalWrite(j+2, ledPattern[i][j]);
             }
             delay(100);
         }
+    }
+    //Get Random Number
+    int roll = random(2, 8);
+    for (int i = 0; i < 7; i++){
+        digitalWrite(i+2, ledPattern[roll][i]);
+    }
+    delay(2000);
+    for(int i = 0; i < 7; i++){
+        digitalWrite(i+2, ledPattern[0][i]);
     }
 }
