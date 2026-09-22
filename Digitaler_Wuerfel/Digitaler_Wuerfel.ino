@@ -52,3 +52,7 @@ void shuffle(){
         digitalWrite(i+2, ledPattern[0][i]);
     }
 }
+
+int randomNumber(int min, int max){
+    int number = 0; 
+}
