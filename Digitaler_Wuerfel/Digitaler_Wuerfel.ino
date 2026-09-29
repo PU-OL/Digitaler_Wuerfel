@@ -27,13 +27,14 @@ void setup() {
 
 void loop() {
     //Check Button
-    Serial.println(analogRead(A3));
+    //Serial.println(analogRead(A3));
     if(analogRead(A3) < 400){
        shuffle();
     }
 }
 
 void shuffle(){
+    int count = 0;
     while(analogRead(A3) < 600){
         for (int i = 2; i < 8; i++){
             for (int j = 0; j < 7; j++){
@@ -41,6 +42,7 @@ void shuffle(){
             }
             delay(100);
         }
+        count++;
     }
     //Get Random Number
     int roll = random(2, 8);
@@ -53,6 +55,16 @@ void shuffle(){
     }
 }
 
-int randomNumber(int min, int max){
+int randomNumber(int min, int max, int count){
     int number = 0; 
+    List<int> possibleNumbers = new List<int>();
+
+    for(int i = min; i < max; i++){
+        possibleNumbers.Add(i);
+    }
+    
+    int pos = count % possibleNumbers.Count;
+    number = possibleNumbers[pos];
+
+    return number;
 }
