@@ -27,13 +27,14 @@ void setup() {
 
 void loop() {
     //Check Button
-    Serial.println(analogRead(A3));
+    //Serial.println(analogRead(A3));
     if(analogRead(A3) < 400){
        shuffle();
     }
 }
 
 void shuffle(){
+    int count = 0;
     while(analogRead(A3) < 600){
         for (int i = 2; i < 8; i++){
             for (int j = 0; j < 7; j++){
@@ -41,9 +42,10 @@ void shuffle(){
             }
             delay(100);
         }
+        count++;
     }
     //Get Random Number
-    int roll = random(2, 8);
+    int roll = randomNumber(1, 7, count);
     for (int i = 0; i < 7; i++){
         digitalWrite(i+2, ledPattern[roll][i]);
     }
@@ -51,4 +53,12 @@ void shuffle(){
     for(int i = 0; i < 7; i++){
         digitalWrite(i+2, ledPattern[0][i]);
     }
+}
+
+int randomNumber(int min, int max, int count){
+    if (max <= min) {
+        return min;
+    }
+
+    return min + (count % (max - min));
 }
