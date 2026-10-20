@@ -45,7 +45,7 @@ void shuffle(){
         count++;
     }
     //Get Random Number
-    int roll = random(2, 8);
+    int roll = randomNumber(1, 7, count);
     for (int i = 0; i < 7; i++){
         digitalWrite(i+2, ledPattern[roll][i]);
     }
@@ -56,15 +56,9 @@ void shuffle(){
 }
 
 int randomNumber(int min, int max, int count){
-    int number = 0; 
-    List<int> possibleNumbers = new List<int>();
-
-    for(int i = min; i < max; i++){
-        possibleNumbers.Add(i);
+    if (max <= min) {
+        return min;
     }
-    
-    int pos = count % possibleNumbers.Count;
-    number = possibleNumbers[pos];
 
-    return number;
+    return min + (count % (max - min));
 }
